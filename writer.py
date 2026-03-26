@@ -114,7 +114,8 @@ def create_entry(entry):
     response = requests.post(
         "https://api.notion.com/v1/pages",
         headers=HEADERS,
-        json=payload
+        json=payload,
+        timeout=30,
     )
 
     if not response.ok:
