@@ -49,10 +49,12 @@ def build_rich_text(value):
 
 
 def validate_entry(entry):
-    if entry["type"] not in VALID_TYPES:
-        raise ValueError("Invalid type")
-    if entry["status"] not in VALID_STATUS:
-        raise ValueError("Invalid status")
+    entry_type = entry.get("type")
+    entry_status = entry.get("status")
+    if entry_type not in VALID_TYPES:
+        raise ValueError(f"Invalid or missing type: {entry_type!r}. Must be one of: {VALID_TYPES}")
+    if entry_status not in VALID_STATUS:
+        raise ValueError(f"Invalid or missing status: {entry_status!r}. Must be one of: {VALID_STATUS}")
 
 
 def build_payload(entry):
