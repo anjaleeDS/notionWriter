@@ -58,9 +58,13 @@ def validate_entry(entry):
 
 
 def build_payload(entry):
+    title = entry.get("title")
+    if not title:
+        raise ValueError("Entry must have a non-empty 'title' field.")
+
     properties = {
         "Title": {
-            "title": [{"text": {"content": entry["title"]}}]
+            "title": [{"text": {"content": title}}]
         },
         "Type": {
             "select": {"name": entry["type"]}
