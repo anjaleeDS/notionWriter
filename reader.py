@@ -20,6 +20,17 @@ load_dotenv()
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
+
+def _check_env():
+    if not os.getenv("NOTION_TOKEN"):
+        raise RuntimeError("NOTION_TOKEN is not set. Add it to your .env file.")
+    if not os.getenv("NOTION_DATABASE_ID"):
+        raise RuntimeError("NOTION_DATABASE_ID is not set. Add it to your .env file.")
+
+
+if NOTION_TOKEN is None or NOTION_DATABASE_ID is None:
+    _check_env()
+
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
     "Notion-Version": "2022-06-28",
