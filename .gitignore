@@ -13,6 +13,10 @@ __pycache__/
 .venv/
 venv/
 env/
+.venv_verify/
+
+# Claude/Cursor worktrees & artifacts
+.claude/worktrees/
 
 # Distribution / packaging
 dist/
@@ -33,3 +37,9 @@ htmlcov/
 
 # PII
 payload.json
+
+# Local eval artifacts (don’t commit)
+skill-evals/
+
+# Local editor workspace
+*.code-workspace
