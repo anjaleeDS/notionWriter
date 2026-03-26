@@ -76,7 +76,7 @@ def build_payload(entry):
             "rich_text": build_rich_text(entry.get("project"))
         },
         "Source Model": {
-            "select": {"name": entry.get("source_model", "ChatGPT")}
+            "select": {"name": entry.get("source_model", "Claude")}
         }
     }
 
