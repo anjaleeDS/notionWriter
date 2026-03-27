@@ -50,6 +50,7 @@ def generate_entry(messages: list[dict], source_model: str = "Claude") -> dict:
         messages=[{"role": "user", "content": prompt}],
     )
     raw = response.content[0].text.strip()
+    print(f"[generate_entry] raw response: {repr(raw[:200])}")
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
