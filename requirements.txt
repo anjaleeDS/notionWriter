@@ -1,2 +1,6 @@
 requests==2.32.4
 python-dotenv==1.0.0
+fastapi
+uvicorn[standard]
+anthropic
+httpx
