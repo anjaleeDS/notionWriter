@@ -41,6 +41,7 @@ async def handle_update(update: dict) -> None:
     text = message.get("text", "").strip()
 
     if not text:
+        await _send(chat_id, "I can only read text messages for now — please type your message.")
         return
 
     # ── commands ──────────────────────────────────────────────────────────────
