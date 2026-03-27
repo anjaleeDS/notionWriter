@@ -45,7 +45,7 @@ def generate_entry(messages: list[dict], source_model: str = "Claude") -> dict:
     )
     response = _client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=1024,
+        max_tokens=4096,
         system=_FORMATTER_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     )
