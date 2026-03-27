@@ -56,18 +56,20 @@ Always return a single JSON object. Nothing before it, nothing after it. No mark
 - Leave `""` for Reflection entries or if no next action is stated
 
 **outcome**
-- What happened or what was achieved, if mentioned
-- Leave `""` if not applicable or unclear
+- Summarise the conclusion, plan, or answer the assistant arrived at by the end of the conversation
+- Use the assistant's final message as the primary source — what did it conclude, recommend, or resolve?
+- Write as a concise 1-3 sentence summary in third person (e.g. "The user decided to prioritise X first, then Y.")
+- Leave `""` only if the conversation ended without any conclusion or resolution
 
 **source_model**
 - Set to `"Claude"` if you are Claude
 - Set to `"ChatGPT"` if you are ChatGPT
 
 **raw_content**
-- The full cleaned-up version of the ramble
-- Fix obvious transcription errors, remove filler words (um, uh, like, you know)
-- Preserve the meaning and voice — do not rewrite or summarise
-- Write in first person, past or present tense, as the user spoke it
+- The full conversation transcript, formatted as alternating turns
+- Format: "User: [message]\n\nAssistant: [message]\n\nUser: ..." and so on
+- Include every message in order — do not summarise or skip any turns
+- Clean up obvious transcription errors and filler words (um, uh, like, you know) in the user turns only
 
 ---
 
