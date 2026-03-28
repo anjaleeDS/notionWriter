@@ -22,6 +22,15 @@ def _make_fenced_response(entry: dict) -> unittest.mock.Mock:
     return msg
 
 
+def _make_preamble_response(entry: dict) -> unittest.mock.Mock:
+    """Build a fake response where Claude adds prose before the JSON object."""
+    msg = unittest.mock.Mock()
+    msg.content = [unittest.mock.Mock(
+        text=f"I'll format this from the conversation available.\n\n{json.dumps(entry)}"
+    )]
+    return msg
+
+
 class FormatEntryTypeOverrideTests(unittest.TestCase):
     """Core new behaviour: entry_type stomps the formatter's own type field."""
 
@@ -125,6 +134,15 @@ class FormatEntryJsonParsingTests(unittest.TestCase):
         with unittest.mock.patch.object(
             formatter._client.messages, "create",
             return_value=_make_fenced_response(self.base_entry),
+        ):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        self.assertEqual(result["title"], "Fenced test")
+
+    def test_prose_preamble_is_stripped_and_parsed(self):
+        """Regression: Claude prefixes JSON with prose — should still parse correctly."""
+        with unittest.mock.patch.object(
+            formatter._client.messages, "create",
+            return_value=_make_preamble_response(self.base_entry),
         ):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["title"], "Fenced test")

@@ -31,6 +31,10 @@ def format_entry(messages: list[dict], source_model: str = "Claude", entry_type:
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
+    # strip any prose preamble before the JSON object
+    brace = raw.find("{")
+    if brace > 0:
+        raw = raw[brace:]
     entry = json.loads(raw)
     if entry_type is not None:
         entry["type"] = entry_type
