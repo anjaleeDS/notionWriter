@@ -15,6 +15,7 @@ import os
 import httpx
 
 import llm_client
+from formatter import format_entry
 from session import clear_session, get_session
 from writer import create_entry
 
@@ -54,8 +55,10 @@ async def handle_update(update: dict) -> None:
                 "Send me anything — a thought, a problem, something you're working through. "
                 "I'll respond and we'll talk it out. When you're ready, /save writes the "
                 "conversation to Notion.\n\n"
-                "/save — save conversation to Notion\n"
-                "/new  — start a fresh conversation"
+                "/save             — save to Notion (auto-detect type)\n"
+                "/save reflection  — save and force type to Reflection\n"
+                "/save execution   — save and force type to Execution\n"
+                "/new              — start a fresh conversation"
             ),
         )
         return
@@ -65,19 +68,29 @@ async def handle_update(update: dict) -> None:
         await _send(chat_id, "✨ Fresh start. What's on your mind?")
         return
 
-    if text == "/save":
+    if text == "/save" or text.startswith("/save "):
+        parts = text.split(maxsplit=1)
+        arg = parts[1].lower() if len(parts) > 1 else None
+
+        VALID_OVERRIDES = {"reflection": "Reflection", "execution": "Execution"}
+        entry_type = VALID_OVERRIDES.get(arg) if arg else None
+
+        if arg and entry_type is None:
+            await _send(chat_id, f"I don't recognise '{arg}'. Did you mean /save reflection or /save execution?")
+            return
+
         session = get_session(chat_id)
         if not session["messages"]:
             await _send(chat_id, "Nothing to save yet — start a conversation first.")
             return
+
         await _send(chat_id, "📝 Saving to Notion…")
         try:
-            entry = llm_client.generate_entry(
-                session["messages"], source_model=session["model"]
-            )
+            entry = format_entry(session["messages"], source_model=session["model"], entry_type=entry_type)
             result = create_entry(entry)
             url = result.get("url", "")
-            await _send(chat_id, f"✅ Saved!\n{url}")
+            saved_type = entry["type"]
+            await _send(chat_id, f"✅ Saved as {saved_type}!\n{url}")
         except Exception as e:
             await _send(chat_id, f"❌ Save failed: {e}")
         clear_session(chat_id)
