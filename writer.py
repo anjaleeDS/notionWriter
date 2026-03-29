@@ -42,6 +42,35 @@ HEADERS = {
 }
 
 
+def build_paragraph_blocks(text, chunk_size=2000):
+    """Split text into Notion paragraph blocks of at most chunk_size chars.
+
+    Notion's rich_text limit is 2000 chars per text object. Long conversations
+    are split on the last newline within each window (falling back to a hard cut)
+    so paragraphs stay readable. Returns at least one block (empty if no text).
+
+    Note: Notion allows up to 100 children blocks per API request. At 2000
+    chars per block that's ~200,000 chars — enough for any realistic conversation.
+    """
+    if not text:
+        return [{"object": "block", "type": "paragraph",
+                 "paragraph": {"rich_text": []}}]
+    blocks = []
+    while text:
+        if len(text) <= chunk_size:
+            chunk, text = text, ""
+        else:
+            split = text.rfind("\n", 0, chunk_size)
+            split = split if split > 0 else chunk_size
+            chunk, text = text[:split], text[split:].lstrip("\n")
+        blocks.append({
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {"rich_text": [{"type": "text", "text": {"content": chunk}}]}
+        })
+    return blocks
+
+
 def build_rich_text(value):
     if not value:
         return []
@@ -80,28 +109,29 @@ def build_payload(entry):
         }
     }
 
+    # next_action is Execution-only
     if entry["type"] == "Execution":
         if entry.get("next_action"):
             properties["Next Action"] = {
                 "rich_text": build_rich_text(entry["next_action"])
             }
-        if entry.get("outcome"):
-            properties["Outcome"] = {
-                "rich_text": build_rich_text(entry["outcome"])
-            }
+
+    # outcome is written for all entry types (Reflection and Execution)
+    if entry.get("outcome"):
+        properties["Outcome"] = {
+            "rich_text": build_rich_text(entry["outcome"])
+        }
+
+    # date is Python-injected; guard makes this safe for old fixtures without the field
+    if entry.get("date"):
+        properties["Date"] = {
+            "date": {"start": entry["date"]}
+        }
 
     payload = {
         "parent": {"database_id": NOTION_DATABASE_ID},
         "properties": properties,
-        "children": [
-            {
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {
-                    "rich_text": build_rich_text(entry.get("raw_content"))
-                }
-            }
-        ]
+        "children": build_paragraph_blocks(entry.get("raw_content", ""))
     }
 
     return payload

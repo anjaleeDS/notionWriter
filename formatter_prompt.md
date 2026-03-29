@@ -25,6 +25,7 @@ Always return a single JSON object. Nothing before it, nothing after it. No mark
   "next_action": "string or empty string",
   "outcome": "string or empty string",
   "source_model": "Claude" or "ChatGPT",
+  "date": "YYYY-MM-DD (injected by Python — output empty string)",
   "raw_content": "string"
 }
 ```
@@ -66,6 +67,10 @@ Always return a single JSON object. Nothing before it, nothing after it. No mark
 **source_model**
 - Set to `"Claude"` if you are Claude
 - Set to `"ChatGPT"` if you are ChatGPT
+
+**date**
+- Do not generate this value — it is injected by Python as today's date
+- Output `""` if you must include the field; it will be overwritten
 
 **raw_content**
 - The full conversation transcript, formatted as alternating turns

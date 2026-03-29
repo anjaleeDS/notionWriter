@@ -2,6 +2,7 @@
 # Converts a conversation transcript into a structured Notion entry dict.
 # The LLM decides all fields; entry_type optionally overrides the type field after parsing.
 
+import datetime
 import json
 from pathlib import Path
 
@@ -38,4 +39,9 @@ def format_entry(messages: list[dict], source_model: str = "Claude", entry_type:
     entry = json.loads(raw)
     if entry_type is not None:
         entry["type"] = entry_type
+    # Always override source_model with the Python-tracked value — the LLM
+    # sometimes misidentifies itself when formatting a transcript.
+    entry["source_model"] = source_model
+    # Inject today's date from Python so the LLM never has to guess it.
+    entry["date"] = datetime.date.today().isoformat()
     return entry

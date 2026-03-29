@@ -1,3 +1,4 @@
+import datetime
 import json
 import unittest
 import unittest.mock
@@ -30,6 +31,111 @@ def _make_preamble_response(entry: dict) -> unittest.mock.Mock:
     )]
     return msg
 
+
+# ---------------------------------------------------------------------------
+# Source model override
+# ---------------------------------------------------------------------------
+
+class SourceModelOverrideTests(unittest.TestCase):
+    """Python-passed source_model must always win over whatever the LLM returns."""
+
+    base_entry = {
+        "title": "Test",
+        "type": "Reflection",
+        "status": "Inbox",
+        "project": "",
+        "next_action": "",
+        "outcome": "",
+        "source_model": "ChatGPT",   # LLM wrongly says ChatGPT
+        "raw_content": "User: hi. Assistant: hello.",
+    }
+
+    def test_claude_default_overrides_llm_chatgpt(self):
+        """Default source_model='Claude' should overwrite LLM's 'ChatGPT'."""
+        with unittest.mock.patch.object(
+            formatter._client.messages, "create",
+            return_value=_make_response(self.base_entry),
+        ):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        self.assertEqual(result["source_model"], "Claude")
+
+    def test_explicit_claude_param_overrides_llm_chatgpt(self):
+        """Explicit source_model='Claude' should overwrite LLM's 'ChatGPT'."""
+        with unittest.mock.patch.object(
+            formatter._client.messages, "create",
+            return_value=_make_response(self.base_entry),
+        ):
+            result = formatter.format_entry(
+                [{"role": "user", "content": "hi"}],
+                source_model="Claude",
+            )
+        self.assertEqual(result["source_model"], "Claude")
+
+    def test_chatgpt_param_is_respected(self):
+        """If Python explicitly passes 'ChatGPT', that should be the result."""
+        entry = {**self.base_entry, "source_model": "Claude"}  # LLM says Claude
+        with unittest.mock.patch.object(
+            formatter._client.messages, "create",
+            return_value=_make_response(entry),
+        ):
+            result = formatter.format_entry(
+                [{"role": "user", "content": "hi"}],
+                source_model="ChatGPT",
+            )
+        self.assertEqual(result["source_model"], "ChatGPT")
+
+
+# ---------------------------------------------------------------------------
+# Date injection
+# ---------------------------------------------------------------------------
+
+class DateInjectionTests(unittest.TestCase):
+    """Today's date must always be injected by Python, never from the LLM."""
+
+    base_entry = {
+        "title": "Test",
+        "type": "Reflection",
+        "status": "Inbox",
+        "project": "",
+        "next_action": "",
+        "outcome": "",
+        "source_model": "Claude",
+        "raw_content": "User: hi. Assistant: hello.",
+    }
+
+    def test_date_is_injected_as_today(self):
+        with unittest.mock.patch.object(
+            formatter._client.messages, "create",
+            return_value=_make_response(self.base_entry),
+        ):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        self.assertEqual(result["date"], datetime.date.today().isoformat())
+
+    def test_date_overrides_any_llm_value(self):
+        """Even if LLM returns a date, Python's value wins."""
+        entry = {**self.base_entry, "date": "1999-01-01"}
+        with unittest.mock.patch.object(
+            formatter._client.messages, "create",
+            return_value=_make_response(entry),
+        ):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        self.assertEqual(result["date"], datetime.date.today().isoformat())
+
+    def test_date_format_is_iso(self):
+        """Date must be in YYYY-MM-DD format."""
+        with unittest.mock.patch.object(
+            formatter._client.messages, "create",
+            return_value=_make_response(self.base_entry),
+        ):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        # Validate it parses back cleanly as an ISO date
+        parsed = datetime.date.fromisoformat(result["date"])
+        self.assertEqual(parsed, datetime.date.today())
+
+
+# ---------------------------------------------------------------------------
+# Entry type override (existing tests, updated for new fields)
+# ---------------------------------------------------------------------------
 
 class FormatEntryTypeOverrideTests(unittest.TestCase):
     """Core new behaviour: entry_type stomps the formatter's own type field."""
@@ -93,7 +199,7 @@ class FormatEntryTypeOverrideTests(unittest.TestCase):
         self.assertEqual(result["type"], "Execution")
 
     def test_other_fields_are_preserved_after_override(self):
-        """Type override should not affect any other field."""
+        """Type override should not affect title, status, or raw_content."""
         with unittest.mock.patch.object(
             formatter._client.messages, "create",
             return_value=_make_response(self.base_entry),
@@ -104,9 +210,14 @@ class FormatEntryTypeOverrideTests(unittest.TestCase):
             )
         self.assertEqual(result["title"], self.base_entry["title"])
         self.assertEqual(result["status"], self.base_entry["status"])
-        self.assertEqual(result["source_model"], self.base_entry["source_model"])
         self.assertEqual(result["raw_content"], self.base_entry["raw_content"])
+        # source_model is always overridden by Python — default is "Claude"
+        self.assertEqual(result["source_model"], "Claude")
 
+
+# ---------------------------------------------------------------------------
+# JSON parsing (existing tests, unchanged)
+# ---------------------------------------------------------------------------
 
 class FormatEntryJsonParsingTests(unittest.TestCase):
     """Formatter correctly handles raw JSON and fenced JSON responses."""
@@ -147,6 +258,10 @@ class FormatEntryJsonParsingTests(unittest.TestCase):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["title"], "Fenced test")
 
+
+# ---------------------------------------------------------------------------
+# /save command parsing (existing tests, unchanged)
+# ---------------------------------------------------------------------------
 
 class SaveCommandParsingTests(unittest.TestCase):
     """/save command parsing logic — tests the VALID_OVERRIDES lookup directly."""
