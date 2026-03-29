@@ -86,7 +86,9 @@ async def handle_update(update: dict) -> None:
 
         await _send(chat_id, "📝 Saving to Notion…")
         try:
-            entry = format_entry(session["messages"], source_model=session["model"], entry_type=entry_type)
+            TYPE_TO_MODEL = {"Execution": "ChatGPT", "Reflection": "Claude"}
+            source_model = TYPE_TO_MODEL.get(entry_type) if entry_type else session["model"]
+            entry = format_entry(session["messages"], source_model=source_model, entry_type=entry_type)
             result = create_entry(entry)
             url = result.get("url", "")
             saved_type = entry["type"]
