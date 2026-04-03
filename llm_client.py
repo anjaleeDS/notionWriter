@@ -11,8 +11,18 @@ import openai
 
 from models import CLAUDE_CHAT_MODEL, CHAD_CHAT_MODEL, DEFAULT_CHAT_MODEL
 
-_anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+_anthropic_client = None
 _openai_client = None
+
+
+def _get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
+        _anthropic_client = anthropic.Anthropic(api_key=api_key)
+    return _anthropic_client
 
 
 def _get_openai_client():
@@ -38,7 +48,8 @@ def _is_anthropic_model(model: str) -> bool:
 
 def send(messages: list[dict], model: str = DEFAULT_CHAT_MODEL) -> tuple[str, dict]:
     if _is_anthropic_model(model):
-        response = _anthropic_client.messages.create(
+        client = _get_anthropic_client()
+        response = client.messages.create(
             model=model,
             max_tokens=1024,
             system=_CHAT_SYSTEM,

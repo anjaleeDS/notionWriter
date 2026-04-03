@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # usage_tracker.py
 # Tracks per-call token usage and estimated cost.
 # Logs to usage_log.json and provides budget warning checks.

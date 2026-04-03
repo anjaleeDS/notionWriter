@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # formatter.py
 # Converts a conversation transcript into a structured Notion entry dict.
 # The LLM decides all fields; entry_type optionally overrides the type field after parsing.
@@ -6,7 +8,7 @@ import datetime
 import json
 from pathlib import Path
 
-from llm_client import _anthropic_client, _get_openai_client, _is_anthropic_model
+from llm_client import _get_anthropic_client, _get_openai_client, _is_anthropic_model
 from models import FORMATTER_MODEL
 from usage_tracker import log_usage
 
@@ -30,7 +32,8 @@ def format_entry(
     )
 
     if _is_anthropic_model(FORMATTER_MODEL):
-        response = _anthropic_client.messages.create(
+        client = _get_anthropic_client()
+        response = client.messages.create(
             model=FORMATTER_MODEL,
             max_tokens=4096,
             system=[{
