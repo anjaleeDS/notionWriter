@@ -14,6 +14,7 @@ import json
 import sys
 
 from router import save_reflection, save_execution, load_context, load_entry, load_entry_with_body
+from usage_tracker import get_monthly_total
 from writer import create_entry
 
 
@@ -134,6 +135,21 @@ def cmd_get(args):
         entry = load_entry(args.page_id)
 
     print_entry(entry, compact=False)
+
+
+def cmd_usage(_args=None):
+    summary = get_monthly_total()
+    print(f"\n📊 Usage for {summary['month']}")
+    print(f"{'═' * 50}")
+    print(f"  Total cost:    ${summary['total_cost_usd']:.4f} / ${summary['budget_usd']:.2f} ({summary['budget_used_pct']}%)")
+    print(f"  API calls:     {summary['api_calls']}")
+    print(f"  Input tokens:  {summary['total_input_tokens']:,}")
+    print(f"  Output tokens: {summary['total_output_tokens']:,}")
+    if summary["by_model"]:
+        print(f"\n  By model:")
+        for model, cost in sorted(summary["by_model"].items()):
+            print(f"    {model}: ${cost:.4f}")
+    print()
 
 
 # ── help ─────────────────────────────────────────────────────────────────────
@@ -315,6 +331,9 @@ def build_parser():
     p_get.add_argument("page_id", help="Notion page ID (32-char hex or UUID format)")
     p_get.add_argument("--body", action="store_true", help="Also fetch page body content")
 
+    # ── usage ────────────────────────────────────────────────────────────────
+    sub.add_parser("usage", help="Show current month's API usage and cost")
+
     # ── help ─────────────────────────────────────────────────────────────────
     sub.add_parser("help", help="Show full usage guide")
 
@@ -333,6 +352,7 @@ def main():
         "save-json": cmd_save_json,
         "list":      cmd_list,
         "get":       cmd_get,
+        "usage":     cmd_usage,
         "help":      cmd_help,
     }
 

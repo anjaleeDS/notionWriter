@@ -38,6 +38,9 @@ htmlcov/
 # PII
 payload.json
 
+# Usage tracking log (local, may contain session data)
+usage_log.json
+
 # Local eval artifacts (don’t commit)
 skill-evals/
 

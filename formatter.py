@@ -6,12 +6,19 @@ import datetime
 import json
 from pathlib import Path
 
-from llm_client import _client, CLAUDE_MODEL
+from llm_client import _anthropic_client, _get_openai_client, _is_anthropic_model
+from models import FORMATTER_MODEL
+from usage_tracker import log_usage
 
 _FORMATTER_PROMPT = (Path(__file__).parent / "formatter_prompt.md").read_text()
 
 
-def format_entry(messages: list[dict], source_model: str = "Claude", entry_type: str | None = None) -> dict:
+def format_entry(
+    messages: list[dict],
+    source_model: str = "Claude",
+    entry_type: str | None = None,
+    session_id: str | None = None,
+) -> dict:
     transcript = "\n".join(
         f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
         for m in messages
@@ -21,13 +28,51 @@ def format_entry(messages: list[dict], source_model: str = "Claude", entry_type:
         "Generate a Notion entry based on this conversation:\n\n"
         f"{transcript}"
     )
-    response = _client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4096,
-        system=_FORMATTER_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
+
+    if _is_anthropic_model(FORMATTER_MODEL):
+        response = _anthropic_client.messages.create(
+            model=FORMATTER_MODEL,
+            max_tokens=4096,
+            system=[{
+                "type": "text",
+                "text": _FORMATTER_PROMPT,
+                "cache_control": {"type": "ephemeral"},
+            }],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        usage = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        }
+        cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+    else:
+        client = _get_openai_client()
+        oai_messages = [
+            {"role": "system", "content": _FORMATTER_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+        response = client.chat.completions.create(
+            model=FORMATTER_MODEL,
+            max_tokens=4096,
+            messages=oai_messages,
+        )
+        raw = response.choices[0].message.content.strip()
+        usage = {
+            "input_tokens": response.usage.prompt_tokens,
+            "output_tokens": response.usage.completion_tokens,
+        }
+        cache_read = 0
+
+    log_usage(
+        model=FORMATTER_MODEL,
+        phase="formatting",
+        input_tokens=usage["input_tokens"],
+        output_tokens=usage["output_tokens"],
+        cache_read_tokens=cache_read,
+        session_id=session_id,
     )
-    raw = response.content[0].text.strip()
+
     print(f"[format_entry] raw response: {repr(raw[:200])}")
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
