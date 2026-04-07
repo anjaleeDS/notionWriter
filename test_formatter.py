@@ -9,10 +9,20 @@ with unittest.mock.patch("anthropic.Anthropic"):
     import formatter
 
 
+def _make_usage():
+    """Build a fake Anthropic usage object."""
+    usage = unittest.mock.Mock()
+    usage.input_tokens = 100
+    usage.output_tokens = 50
+    usage.cache_read_input_tokens = 0
+    return usage
+
+
 def _make_response(entry: dict) -> unittest.mock.Mock:
     """Build a fake Anthropic response containing a JSON entry."""
     msg = unittest.mock.Mock()
     msg.content = [unittest.mock.Mock(text=json.dumps(entry))]
+    msg.usage = _make_usage()
     return msg
 
 
@@ -20,6 +30,7 @@ def _make_fenced_response(entry: dict) -> unittest.mock.Mock:
     """Build a fake response where the JSON is wrapped in markdown fences."""
     msg = unittest.mock.Mock()
     msg.content = [unittest.mock.Mock(text=f"```json\n{json.dumps(entry)}\n```")]
+    msg.usage = _make_usage()
     return msg
 
 
@@ -29,7 +40,23 @@ def _make_preamble_response(entry: dict) -> unittest.mock.Mock:
     msg.content = [unittest.mock.Mock(
         text=f"I'll format this from the conversation available.\n\n{json.dumps(entry)}"
     )]
+    msg.usage = _make_usage()
     return msg
+
+
+def _mock_anthropic_formatter(response):
+    """Return a context manager that mocks the formatter to use a fake Anthropic client.
+
+    This patches both _is_anthropic_model (to force the Anthropic branch)
+    and _get_anthropic_client (to return a fake client with the given response).
+    """
+    mock_client = unittest.mock.Mock()
+    mock_client.messages.create.return_value = response
+    return unittest.mock.patch.multiple(
+        "formatter",
+        _is_anthropic_model=unittest.mock.Mock(return_value=True),
+        _get_anthropic_client=unittest.mock.Mock(return_value=mock_client),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -52,19 +79,13 @@ class SourceModelOverrideTests(unittest.TestCase):
 
     def test_claude_default_overrides_llm_chatgpt(self):
         """Default source_model='Claude' should overwrite LLM's 'ChatGPT'."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["source_model"], "Claude")
 
     def test_explicit_claude_param_overrides_llm_chatgpt(self):
         """Explicit source_model='Claude' should overwrite LLM's 'ChatGPT'."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry(
                 [{"role": "user", "content": "hi"}],
                 source_model="Claude",
@@ -74,10 +95,7 @@ class SourceModelOverrideTests(unittest.TestCase):
     def test_chatgpt_param_is_respected(self):
         """If Python explicitly passes 'ChatGPT', that should be the result."""
         entry = {**self.base_entry, "source_model": "Claude"}  # LLM says Claude
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(entry)):
             result = formatter.format_entry(
                 [{"role": "user", "content": "hi"}],
                 source_model="ChatGPT",
@@ -104,29 +122,20 @@ class DateInjectionTests(unittest.TestCase):
     }
 
     def test_date_is_injected_as_today(self):
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["date"], datetime.date.today().isoformat())
 
     def test_date_overrides_any_llm_value(self):
         """Even if LLM returns a date, Python's value wins."""
         entry = {**self.base_entry, "date": "1999-01-01"}
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["date"], datetime.date.today().isoformat())
 
     def test_date_format_is_iso(self):
         """Date must be in YYYY-MM-DD format."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         # Validate it parses back cleanly as an ISO date
         parsed = datetime.date.fromisoformat(result["date"])
@@ -154,19 +163,13 @@ class FormatEntryTypeOverrideTests(unittest.TestCase):
 
     def test_no_override_returns_formatter_type(self):
         """With no entry_type arg, the formatter's own type is kept."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "test"}])
         self.assertEqual(result["type"], "Execution")
 
     def test_reflection_override_stomps_execution(self):
         """entry_type='Reflection' overrides even when formatter says Execution."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry(
                 [{"role": "user", "content": "test"}],
                 entry_type="Reflection",
@@ -176,10 +179,7 @@ class FormatEntryTypeOverrideTests(unittest.TestCase):
     def test_execution_override_stomps_reflection(self):
         """entry_type='Execution' overrides even when formatter says Reflection."""
         entry = {**self.base_entry, "type": "Reflection"}
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(entry)):
             result = formatter.format_entry(
                 [{"role": "user", "content": "test"}],
                 entry_type="Execution",
@@ -188,10 +188,7 @@ class FormatEntryTypeOverrideTests(unittest.TestCase):
 
     def test_none_override_does_not_change_type(self):
         """Explicitly passing entry_type=None leaves the formatter's type intact."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry(
                 [{"role": "user", "content": "test"}],
                 entry_type=None,
@@ -200,10 +197,7 @@ class FormatEntryTypeOverrideTests(unittest.TestCase):
 
     def test_other_fields_are_preserved_after_override(self):
         """Type override should not affect title, status, or raw_content."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry(
                 [{"role": "user", "content": "test"}],
                 entry_type="Reflection",
@@ -234,27 +228,18 @@ class FormatEntryJsonParsingTests(unittest.TestCase):
     }
 
     def test_plain_json_is_parsed(self):
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["title"], "Fenced test")
 
     def test_fenced_json_is_stripped_and_parsed(self):
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_fenced_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_fenced_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["title"], "Fenced test")
 
     def test_prose_preamble_is_stripped_and_parsed(self):
         """Regression: Claude prefixes JSON with prose — should still parse correctly."""
-        with unittest.mock.patch.object(
-            formatter._client.messages, "create",
-            return_value=_make_preamble_response(self.base_entry),
-        ):
+        with _mock_anthropic_formatter(_make_preamble_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["title"], "Fenced test")
 
