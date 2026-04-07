@@ -10,7 +10,7 @@ CHAD_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_CHAT_MODEL = CLAUDE_CHAT_MODEL
 
 # Formatter model (used on /save to structure the entry)
-FORMATTER_MODEL = CLAUDE_CHAT_MODEL
+FORMATTER_MODEL = CHAD_CHAT_MODEL
 
 # Friendly name → API model ID
 MODEL_ALIASES = {
