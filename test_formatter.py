@@ -59,6 +59,47 @@ def _mock_anthropic_formatter(response):
     )
 
 
+def _make_openai_usage():
+    """Build a fake OpenAI usage object."""
+    usage = unittest.mock.Mock()
+    usage.prompt_tokens = 100
+    usage.completion_tokens = 50
+    return usage
+
+
+def _make_openai_response(entry: dict) -> unittest.mock.Mock:
+    """Build a fake OpenAI chat completion response containing a JSON entry."""
+    msg = unittest.mock.Mock()
+    msg.choices = [unittest.mock.Mock(message=unittest.mock.Mock(content=json.dumps(entry)))]
+    msg.usage = _make_openai_usage()
+    return msg
+
+
+def _make_openai_fenced_response(entry: dict) -> unittest.mock.Mock:
+    """Build a fake OpenAI response where the JSON is wrapped in markdown fences."""
+    msg = unittest.mock.Mock()
+    msg.choices = [unittest.mock.Mock(message=unittest.mock.Mock(
+        content=f"```json\n{json.dumps(entry)}\n```"
+    ))]
+    msg.usage = _make_openai_usage()
+    return msg
+
+
+def _mock_openai_formatter(response):
+    """Return a context manager that mocks the formatter to use a fake OpenAI client.
+
+    This patches _is_anthropic_model (to force the OpenAI branch)
+    and _get_openai_client (to return a fake client with the given response).
+    """
+    mock_client = unittest.mock.Mock()
+    mock_client.chat.completions.create.return_value = response
+    return unittest.mock.patch.multiple(
+        "formatter",
+        _is_anthropic_model=unittest.mock.Mock(return_value=False),
+        _get_openai_client=unittest.mock.Mock(return_value=mock_client),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Source model override
 # ---------------------------------------------------------------------------
@@ -242,6 +283,66 @@ class FormatEntryJsonParsingTests(unittest.TestCase):
         with _mock_anthropic_formatter(_make_preamble_response(self.base_entry)):
             result = formatter.format_entry([{"role": "user", "content": "hi"}])
         self.assertEqual(result["title"], "Fenced test")
+
+
+# ---------------------------------------------------------------------------
+# OpenAI path — mirrors key tests for the GPT-4o-mini code branch
+# ---------------------------------------------------------------------------
+
+class OpenAIFormatterTests(unittest.TestCase):
+    """Tests that the OpenAI code path in format_entry() works correctly."""
+
+    base_entry = {
+        "title": "Test OpenAI",
+        "type": "Execution",
+        "status": "Inbox",
+        "project": "",
+        "next_action": "do the thing",
+        "outcome": "figured it out",
+        "source_model": "ChatGPT",
+        "raw_content": "User: hi. Assistant: hello.",
+    }
+
+    def test_plain_json_is_parsed(self):
+        """OpenAI path: plain JSON response is parsed correctly."""
+        with _mock_openai_formatter(_make_openai_response(self.base_entry)):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        self.assertEqual(result["title"], "Test OpenAI")
+        self.assertEqual(result["type"], "Execution")
+
+    def test_fenced_json_is_stripped_and_parsed(self):
+        """OpenAI path: markdown-fenced JSON is handled correctly."""
+        with _mock_openai_formatter(_make_openai_fenced_response(self.base_entry)):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        self.assertEqual(result["title"], "Test OpenAI")
+
+    def test_source_model_override(self):
+        """OpenAI path: Python source_model overrides LLM value."""
+        entry = {**self.base_entry, "source_model": "Claude"}  # LLM says wrong thing
+        with _mock_openai_formatter(_make_openai_response(entry)):
+            result = formatter.format_entry(
+                [{"role": "user", "content": "hi"}],
+                source_model="ChatGPT",
+            )
+        self.assertEqual(result["source_model"], "ChatGPT")
+
+    def test_date_is_injected(self):
+        """OpenAI path: date is Python-injected, not from LLM."""
+        with _mock_openai_formatter(_make_openai_response(self.base_entry)):
+            result = formatter.format_entry([{"role": "user", "content": "hi"}])
+        self.assertEqual(result["date"], datetime.date.today().isoformat())
+
+    def test_entry_type_override(self):
+        """OpenAI path: entry_type param overrides LLM classification."""
+        with _mock_openai_formatter(_make_openai_response(self.base_entry)):
+            result = formatter.format_entry(
+                [{"role": "user", "content": "hi"}],
+                entry_type="Reflection",
+            )
+        self.assertEqual(result["type"], "Reflection")
+        # Other fields preserved
+        self.assertEqual(result["title"], "Test OpenAI")
+        self.assertEqual(result["next_action"], "do the thing")
 
 
 # ---------------------------------------------------------------------------
