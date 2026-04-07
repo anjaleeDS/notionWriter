@@ -107,3 +107,7 @@ python3 -m unittest -v test_writer.py
 ## Troubleshooting
 
 - **`validation_error` / "X is not a property that exists"**: Add the missing property to your Notion database, or rename it to match the table above, or adjust `build_payload` in `writer.py` (and the corresponding reads in `reader.py`) to match your schema.
+
+## But Why
+
+
