@@ -82,20 +82,29 @@ Always return a single JSON object. Nothing before it, nothing after it. No mark
 
 ## Decision guide: Reflection vs Execution
 
-Use this if you are unsure:
+**The core question: Is the user trying to DO something, or trying to UNDERSTAND THEMSELVES?**
 
-| Signal in the ramble | Type |
-|---|---|
-| "I've been thinking about…" | Reflection |
-| "I noticed that…" | Reflection |
-| "I'm trying to understand…" | Reflection |
-| "I wonder if…" | Reflection |
-| "I did / I finished / I shipped…" | Execution |
-| "I need to / I'm going to…" | Execution |
-| "The next step is…" | Execution |
-| "I decided to…" | Execution |
+- Doing, planning, researching, investigating, figuring out, building, deciding → **Execution**
+- Processing emotions, noticing personal patterns, exploring feelings, self-awareness → **Reflection**
 
-If a ramble contains both thinking and doing, pick the dominant one. If truly 50/50, use `"Reflection"`.
+**IMPORTANT: Most conversations are Execution.** Only classify as Reflection when the user is genuinely processing emotions or examining their own behaviour/mindset. When in doubt, choose Execution.
+
+**Execution signals** (any of these → Execution):
+- Asking questions to get information ("what does X mean", "how do I do Y")
+- Researching or investigating a topic, even casually
+- Figuring something out, exploring options, comparing approaches
+- Tasks completed, in progress, or planned
+- Decisions made or being weighed
+- Problem-solving of any kind
+- Asking for help, advice, or recommendations
+
+**Reflection signals** (needs MOST of these → Reflection):
+- Emotional language about themselves ("I feel", "I noticed about myself", "I struggle with")
+- Examining personal patterns, habits, or mindset
+- No external task or goal driving the conversation
+- The user is the subject, not a project or topic
+
+**If a conversation has BOTH**, ask: is there an external goal or task? If yes → Execution. A user can have feelings about a task and it's still Execution.
 
 ---
 
@@ -123,7 +132,32 @@ Output:
 
 ---
 
-## Example 2
+## Example 2 — Research / investigation (Execution)
+
+User ramble:
+> "figure out what 'top 5' means for up to date AI news. Ray had it on his Obsidian.
+> I'm pretty sure he was curating it but he said he just asked the LLM, which isn't helpful."
+
+Output:
+```json
+{
+  "title": "Researching Top 5 AI News Format",
+  "type": "Execution",
+  "status": "Inbox",
+  "project": "",
+  "next_action": "",
+  "outcome": "The user is investigating how Ray curates a 'Top 5' AI news list using Obsidian and an LLM, looking for a better approach than generic LLM summaries.",
+  "source_model": "ChatGPT",
+  "date": "",
+  "raw_content": "..."
+}
+```
+
+Why Execution: The user is trying to figure something out — investigating a tool/process. There are no emotions or self-awareness involved. Research and investigation are always Execution.
+
+---
+
+## Example 3
 
 User ramble:
 > "Ok so I finally finished the first draft of the API spec for the v2 project.
